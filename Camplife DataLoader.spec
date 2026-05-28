@@ -9,7 +9,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=openpyxl_binaries,
-    datas=openpyxl_datas + [('apply_update.bat', '.')],
+    datas=openpyxl_datas + [('apply_update.bat', '.'), ('app_icon.png', '.')],
     hiddenimports=(
         openpyxl_hiddenimports
         + collect_submodules('openpyxl')
@@ -47,6 +47,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='app_icon.ico',
 )
 coll = COLLECT(
     exe,

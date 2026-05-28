@@ -11,7 +11,7 @@ from PySide6.QtGui import QMouseEvent, QIcon, QPixmap, QPainter
 from PySide6.QtCore import Qt, Slot, QSize
 from PySide6.QtSvg import QSvgRenderer
 
-from config import VERSION, CONFIG_FILE, CACHE_FILE, UPDATE_REPO_OWNER, UPDATE_REPO_NAME
+from config import VERSION, CONFIG_FILE, CACHE_FILE, UPDATE_REPO_OWNER, UPDATE_REPO_NAME, APP_DIR
 from src.api.client import CamplifeAPIClient
 from src.gui.themes import DARK_THEME, LIGHT_THEME, ICON_MIN, ICON_MAX, ICON_CLOSE
 from src.gui.setup_dialog import SetupDialog
@@ -23,6 +23,11 @@ class FramelessCamplifeLoader(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"Camplife Data Loader 🏕️ v{VERSION}")
+        
+        # Set Window Icon
+        icon_path = os.path.join(APP_DIR, "app_icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         screen_geo = QApplication.primaryScreen().availableGeometry()
         w = min(750, int(screen_geo.width() * 0.85))
