@@ -1,0 +1,8 @@
+{
+  "plugins": [
+    "chrome-devtools-plugin",
+    "modern-web-guidance-plugin",
+    "google-antigravity-sdk"
+  ],
+  "mcp_servers": ["clickup"]
+}

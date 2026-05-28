@@ -513,7 +513,7 @@ class FramelessCamplifeLoader(QMainWindow):
         self.update_btn.setText("Downloading 0%")
         
         # Spawn download thread
-        filename = "Camplife_DataLoader_new.exe"
+        filename = "Camplife_DataLoader_new.zip"
         self.update_downloader = UpdateDownloader(self.update_download_url, filename)
         self.update_downloader.progress.connect(self.on_download_progress)
         self.update_downloader.finished.connect(self.on_download_finished)
@@ -539,10 +539,35 @@ class FramelessCamplifeLoader(QMainWindow):
         self.update_label.setText(f"❌ Update download failed: {err_msg[:40]}...")
 
     def apply_update_restart(self, temp_path):
+        import zipfile
+        import shutil
+        
         # Path to current running executable
         current_exe = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
         current_exe_abs = os.path.abspath(current_exe)
+        current_exe_dir = os.path.dirname(current_exe_abs)
+        exe_name = os.path.basename(current_exe_abs)
         
+        # Clean and extract the ZIP package inside a temp folder
+        temp_dir = os.path.dirname(temp_path)
+        extract_dir = os.path.join(temp_dir, "camplife_extracted")
+        
+        try:
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir, ignore_errors=True)
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+        except Exception as e:
+            self.update_label.setText(f"❌ Extraction failed: {str(e)[:30]}")
+            return
+            
+        # The zip file contains 'Camplife DataLoader/' folder containing the actual app files
+        extracted_app_folder = os.path.join(extract_dir, "Camplife DataLoader")
+        if not os.path.exists(extracted_app_folder):
+            extracted_app_folder = extract_dir
+
         # Path to apply_update.bat (located in packaged resources directory)
         bat_path = os.path.join(RESOURCE_DIR, "apply_update.bat")
         
@@ -553,7 +578,7 @@ class FramelessCamplifeLoader(QMainWindow):
         if os.path.exists(bat_path):
             pid = os.getpid()
             # Launch batch script detached
-            subprocess.Popen([bat_path, str(pid), current_exe_abs, temp_path], 
+            subprocess.Popen([bat_path, str(pid), current_exe_dir, extracted_app_folder, exe_name], 
                              creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
             # Exit application
             self.close()
