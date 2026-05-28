@@ -9,7 +9,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=openpyxl_binaries,
-    datas=openpyxl_datas,
+    datas=openpyxl_datas + [('apply_update.bat', '.')],
     hiddenimports=(
         openpyxl_hiddenimports
         + collect_submodules('openpyxl')
