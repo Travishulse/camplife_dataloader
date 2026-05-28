@@ -1,7 +1,7 @@
 import os
 import sys
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 BASE_API = "https://www.camplife.com/hub/api"
 TOKEN_ENDPOINT = "https://www.camplife.com/hub/token?grant_type=client_signature"
 
