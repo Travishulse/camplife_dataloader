@@ -11,7 +11,7 @@ from PySide6.QtGui import QMouseEvent, QIcon, QPixmap, QPainter
 from PySide6.QtCore import Qt, Slot, QSize
 from PySide6.QtSvg import QSvgRenderer
 
-from config import VERSION, CONFIG_FILE, CACHE_FILE, UPDATE_REPO_OWNER, UPDATE_REPO_NAME, APP_DIR
+from config import VERSION, CONFIG_FILE, CACHE_FILE, UPDATE_REPO_OWNER, UPDATE_REPO_NAME, APP_DIR, RESOURCE_DIR
 from src.api.client import CamplifeAPIClient
 from src.gui.themes import DARK_THEME, LIGHT_THEME, ICON_MIN, ICON_MAX, ICON_CLOSE
 from src.gui.setup_dialog import SetupDialog
@@ -25,7 +25,7 @@ class FramelessCamplifeLoader(QMainWindow):
         self.setWindowTitle(f"Camplife Data Loader 🏕️ v{VERSION}")
         
         # Set Window Icon
-        icon_path = os.path.join(APP_DIR, "app_icon.png")
+        icon_path = os.path.join(RESOURCE_DIR, "app_icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
@@ -543,9 +543,8 @@ class FramelessCamplifeLoader(QMainWindow):
         current_exe = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
         current_exe_abs = os.path.abspath(current_exe)
         
-        # Path to apply_update.bat (same directory as config/exe)
-        app_dir = os.path.dirname(current_exe_abs)
-        bat_path = os.path.join(app_dir, "apply_update.bat")
+        # Path to apply_update.bat (located in packaged resources directory)
+        bat_path = os.path.join(RESOURCE_DIR, "apply_update.bat")
         
         if not os.path.exists(bat_path):
             # Try running in root workspace folder
