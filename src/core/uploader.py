@@ -14,7 +14,6 @@ def validate_dataframe(df, column_map, top_fields):
     """
     Validate rows for required fields before upload.
     Returns list of invalid rows: [{"row": int, "issues": [str]}, ...]
-    Logic mirrors upload validation at run() line 119.
     """
     invalid_rows = []
 
@@ -22,6 +21,7 @@ def validate_dataframe(df, column_map, top_fields):
         row_series = df.iloc[r]
         issues = []
 
+        # Camplife ID is always required
         camplife_col = column_map.get("Camplife ID")
         camplife_id = None
         if camplife_col and camplife_col != "N/A":
@@ -37,14 +37,13 @@ def validate_dataframe(df, column_map, top_fields):
         if not camplife_id:
             issues.append("Missing Camplife ID")
 
+        # Check what fields are being supplied for this row
+        # 1. Membership fields
         member_number = None
         mn_col = column_map.get("Member Number")
         if mn_col and mn_col != "N/A":
             raw = row_series.get(mn_col)
             member_number = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        if not member_number:
-            issues.append("Missing Member Number")
 
         membership_name = top_fields.get("Membership Type") or None
         if not membership_name:
@@ -53,16 +52,44 @@ def validate_dataframe(df, column_map, top_fields):
                 raw = row_series.get(mcol)
                 membership_name = str(raw).strip() if raw is not None and not pd.isna(raw) else None
 
-        if not membership_name:
-            issues.append("Missing Membership Type")
-
         eff_from = None
         efcol = column_map.get("Effective From")
         if efcol and efcol != "N/A":
-            eff_from = row_series.get(efcol)
+            raw = row_series.get(efcol)
+            eff_from = str(raw).strip() if raw is not None and not pd.isna(raw) else None
 
-        if eff_from is None or str(eff_from).strip() == "":
-            issues.append("Missing Effective From")
+        # 2. Tag fields
+        tag_val = top_fields.get("Tag") or None
+        if tag_val is None:
+            tcol = column_map.get("Tag")
+            if tcol and tcol != "N/A":
+                raw = row_series.get(tcol)
+                tag_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
+
+        # 3. Note fields
+        note_val = top_fields.get("Note") or None
+        if note_val is None:
+            ncol = column_map.get("Note")
+            if ncol and ncol != "N/A":
+                raw = row_series.get(ncol)
+                note_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
+
+        has_membership = bool(membership_name or member_number or eff_from)
+        has_tag = bool(tag_val)
+        has_note = bool(note_val)
+
+        # A row must have at least one action
+        if not (has_membership or has_tag or has_note):
+            issues.append("Row has no upload data (Membership, Tag, or Note must be supplied)")
+
+        # If they attempted a membership upload, validate all required membership fields
+        if has_membership:
+            if not membership_name:
+                issues.append("Missing Membership Type")
+            if not member_number:
+                issues.append("Missing Member Number")
+            if not eff_from:
+                issues.append("Missing Effective From")
 
         if issues:
             invalid_rows.append({"row": r, "issues": issues})
@@ -189,7 +216,10 @@ class UploadWorker(QThread):
                             raw = row_series.get(ncol)
                             note_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
 
-                    if not camplife_id or not membership_name or not member_number or (eff_from is None or str(eff_from).strip() == ""):
+                    has_membership = bool(membership_name or member_number or eff_from)
+                    if not has_membership:
+                        log_entry["membership"] = None
+                    elif not camplife_id or not membership_name or not member_number or (eff_from is None or str(eff_from).strip() == ""):
                         logger.warning(f"Row {r}: missing required membership fields (ID:{camplife_id}, Name:{membership_name}, Num:{member_number}, From:{eff_from})")
                         log_entry["membership"] = {
                             "method": "PUT",
