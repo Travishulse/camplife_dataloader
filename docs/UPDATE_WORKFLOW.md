@@ -91,9 +91,13 @@ git push origin v1.2.4
 ```
 
 ### 3. Create the GitHub Release (Agent Action)
-The agent should use the GitHub CLI (`gh`) to create and publish the release automatically, attaching the zip payload:
+The agent should use the GitHub CLI (`gh`) to create and publish the release automatically, attaching the zip payload. If the basic `gh` command is not recognized in the system's active PATH, use its absolute installation path:
 ```powershell
+# Standard command
 gh release create v1.2.4 "dist\Camplife_DataLoader.zip" --title "v1.2.4" --generate-notes
+
+# Fallback absolute path (Windows)
+& "C:\Program Files\GitHub CLI\gh.exe" release create v1.2.4 "dist\Camplife_DataLoader.zip" --title "v1.2.4" --generate-notes
 ```
 
 ---
