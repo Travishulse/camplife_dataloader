@@ -7,7 +7,7 @@ import os
 import logging
 
 from config import CONFIG_FILE, TOKEN_ENDPOINT
-from src.core.security import decrypt_secret
+from src.core.security import decrypt_secret, DecryptionError
 
 logger = logging.getLogger("camplife.auth")
 
@@ -80,7 +80,16 @@ def load_credentials_from_config():
 
         key = data.get("api_key", "")
         raw_secret = data.get("api_secret", "")
-        secret = decrypt_secret(raw_secret)
+        try:
+            secret = decrypt_secret(raw_secret)
+        except DecryptionError as de:
+            logger.error(f"Failed to decrypt API secret: {de}")
+            return {
+                "success": False,
+                "key": None,
+                "secret": None,
+                "error": str(de)
+            }
 
         if not key or not secret:
             logger.warning("API credentials incomplete in config")

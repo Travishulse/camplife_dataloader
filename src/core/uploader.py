@@ -10,73 +10,116 @@ from config import BASE_API
 
 logger = logging.getLogger("camplife.upload")
 
+def parse_row_data(row_dict, column_map, top_fields):
+    """
+    Extract and clean all fields for a given row.
+    Returns a dictionary of parsed and cleaned values:
+    {
+        "camplife_id": str or None,
+        "member_number": str or None,
+        "membership_name": str or None,
+        "eff_from": str or None,
+        "eff_to": str or None,
+        "tag_val": str or None,
+        "note_val": str or None
+    }
+    """
+    parsed = {}
+
+    # 1. Camplife ID
+    camplife_col = column_map.get("Camplife ID")
+    camplife_id = None
+    if camplife_col and camplife_col != "N/A":
+        raw = row_dict.get(camplife_col)
+        if raw is not None and not pd.isna(raw):
+            if isinstance(raw, float):
+                camplife_id = str(int(raw))
+            else:
+                camplife_id = str(raw).strip()
+    parsed["camplife_id"] = camplife_id
+
+    # 2. Member Number
+    member_number = None
+    mn_col = column_map.get("Member Number")
+    if mn_col and mn_col != "N/A":
+        raw = row_dict.get(mn_col)
+        if raw is not None and not pd.isna(raw):
+            member_number = str(raw).strip()
+    parsed["member_number"] = member_number
+
+    # 3. Membership Type
+    membership_name = top_fields.get("Membership Type") or None
+    if not membership_name:
+        mcol = column_map.get("Membership Type")
+        if mcol and mcol != "N/A":
+            raw = row_dict.get(mcol)
+            if raw is not None and not pd.isna(raw):
+                membership_name = str(raw).strip()
+    parsed["membership_name"] = membership_name
+
+    # 4. Effective From
+    eff_from = None
+    efcol = column_map.get("Effective From")
+    if efcol and efcol != "N/A":
+        raw = row_dict.get(efcol)
+        if raw is not None and not pd.isna(raw):
+            val_str = str(raw).strip()
+            if val_str != "":
+                eff_from = val_str
+    parsed["eff_from"] = eff_from
+
+    # 5. Effective To
+    eff_to = None
+    etcol = column_map.get("Effective To")
+    if etcol and etcol != "N/A":
+        raw = row_dict.get(etcol)
+        if raw is not None and not pd.isna(raw):
+            val_str = str(raw).strip()
+            if val_str != "":
+                eff_to = val_str
+    parsed["eff_to"] = eff_to
+
+    # 6. Tag
+    tag_val = top_fields.get("Tag") or None
+    if tag_val is None:
+        tcol = column_map.get("Tag")
+        if tcol and tcol != "N/A":
+            raw = row_dict.get(tcol)
+            if raw is not None and not pd.isna(raw):
+                tag_val = str(raw).strip()
+    parsed["tag_val"] = tag_val
+
+    # 7. Note
+    note_val = top_fields.get("Note") or None
+    if note_val is None:
+        ncol = column_map.get("Note")
+        if ncol and ncol != "N/A":
+            raw = row_dict.get(ncol)
+            if raw is not None and not pd.isna(raw):
+                note_val = str(raw).strip()
+    parsed["note_val"] = note_val
+
+    return parsed
+
+
 def validate_dataframe(df, column_map, top_fields):
     """
-    Validate rows for required fields before upload.
+    Validate rows for required fields and valid date formats before upload.
     Returns list of invalid rows: [{"row": int, "issues": [str]}, ...]
     """
     invalid_rows = []
 
-    for r in range(len(df)):
-        row_series = df.iloc[r]
+    # Use to_dict('records') for highly efficient dict iteration
+    for r, row_dict in enumerate(df.to_dict('records')):
+        parsed = parse_row_data(row_dict, column_map, top_fields)
         issues = []
 
-        # Camplife ID is always required
-        camplife_col = column_map.get("Camplife ID")
-        camplife_id = None
-        if camplife_col and camplife_col != "N/A":
-            raw = row_series.get(camplife_col)
-            if raw is None or pd.isna(raw):
-                camplife_id = None
-            else:
-                if isinstance(raw, float):
-                    camplife_id = str(int(raw))
-                else:
-                    camplife_id = str(raw).strip()
-
-        if not camplife_id:
+        if not parsed["camplife_id"]:
             issues.append("Missing Camplife ID")
 
-        # Check what fields are being supplied for this row
-        # 1. Membership fields
-        member_number = None
-        mn_col = column_map.get("Member Number")
-        if mn_col and mn_col != "N/A":
-            raw = row_series.get(mn_col)
-            member_number = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        membership_name = top_fields.get("Membership Type") or None
-        if not membership_name:
-            mcol = column_map.get("Membership Type")
-            if mcol and mcol != "N/A":
-                raw = row_series.get(mcol)
-                membership_name = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        eff_from = None
-        efcol = column_map.get("Effective From")
-        if efcol and efcol != "N/A":
-            raw = row_series.get(efcol)
-            eff_from = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        # 2. Tag fields
-        tag_val = top_fields.get("Tag") or None
-        if tag_val is None:
-            tcol = column_map.get("Tag")
-            if tcol and tcol != "N/A":
-                raw = row_series.get(tcol)
-                tag_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        # 3. Note fields
-        note_val = top_fields.get("Note") or None
-        if note_val is None:
-            ncol = column_map.get("Note")
-            if ncol and ncol != "N/A":
-                raw = row_series.get(ncol)
-                note_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-        has_membership = bool(membership_name or member_number or eff_from)
-        has_tag = bool(tag_val)
-        has_note = bool(note_val)
+        has_membership = bool(parsed["membership_name"] or parsed["member_number"] or parsed["eff_from"])
+        has_tag = bool(parsed["tag_val"])
+        has_note = bool(parsed["note_val"])
 
         # A row must have at least one action
         if not (has_membership or has_tag or has_note):
@@ -84,12 +127,25 @@ def validate_dataframe(df, column_map, top_fields):
 
         # If they attempted a membership upload, validate all required membership fields
         if has_membership:
-            if not membership_name:
+            if not parsed["membership_name"]:
                 issues.append("Missing Membership Type")
-            if not member_number:
+            if not parsed["member_number"]:
                 issues.append("Missing Member Number")
-            if not eff_from:
+            if not parsed["eff_from"]:
                 issues.append("Missing Effective From")
+
+        # Validate date formats for non-empty date fields to prevent silent worker crashes
+        if parsed["eff_from"]:
+            try:
+                pd.to_datetime(parsed["eff_from"], errors='raise')
+            except Exception:
+                issues.append(f"Invalid 'Effective From' date format: '{parsed['eff_from']}'")
+
+        if parsed["eff_to"]:
+            try:
+                pd.to_datetime(parsed["eff_to"], errors='raise')
+            except Exception:
+                issues.append(f"Invalid 'Effective To' date format: '{parsed['eff_to']}'")
 
         if issues:
             invalid_rows.append({"row": r, "issues": issues})
@@ -166,55 +222,16 @@ class UploadWorker(QThread):
                     break
                 log_entry = {}
                 try:
-                    row_series = self.df.iloc[r]
+                    row_dict = self.df.iloc[r].to_dict()
+                    parsed = parse_row_data(row_dict, self.column_map, self.top_fields)
 
-                    camplife_col = self.column_map.get("Camplife ID")
-                    camplife_id = None
-                    if camplife_col and camplife_col != "N/A":
-                        raw = row_series.get(camplife_col)
-                        if raw is None or pd.isna(raw):
-                            camplife_id = None
-                        else:
-                            if isinstance(raw, float):
-                                camplife_id = str(int(raw))
-                            else:
-                                camplife_id = str(raw).strip()
-
-                    member_number = None
-                    mn_col = self.column_map.get("Member Number")
-                    if mn_col and mn_col != "N/A":
-                        raw = row_series.get(mn_col)
-                        member_number = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-                    membership_name = self.top_fields.get("Membership Type") or None
-                    if not membership_name:
-                        mcol = self.column_map.get("Membership Type")
-                        if mcol and mcol != "N/A":
-                            raw = row_series.get(mcol)
-                            membership_name = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-                    eff_from = None
-                    efcol = self.column_map.get("Effective From")
-                    if efcol and efcol != "N/A":
-                        eff_from = row_series.get(efcol)
-                    eff_to = None
-                    etcol = self.column_map.get("Effective To")
-                    if etcol and etcol != "N/A":
-                        eff_to = row_series.get(etcol)
-
-                    tag_val = self.top_fields.get("Tag") or None
-                    if tag_val is None:
-                        tcol = self.column_map.get("Tag")
-                        if tcol and tcol != "N/A":
-                            raw = row_series.get(tcol)
-                            tag_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
-
-                    note_val = self.top_fields.get("Note") or None
-                    if note_val is None:
-                        ncol = self.column_map.get("Note")
-                        if ncol and ncol != "N/A":
-                            raw = row_series.get(ncol)
-                            note_val = str(raw).strip() if raw is not None and not pd.isna(raw) else None
+                    camplife_id = parsed["camplife_id"]
+                    member_number = parsed["member_number"]
+                    membership_name = parsed["membership_name"]
+                    eff_from = parsed["eff_from"]
+                    eff_to = parsed["eff_to"]
+                    tag_val = parsed["tag_val"]
+                    note_val = parsed["note_val"]
 
                     has_membership = bool(membership_name or member_number or eff_from)
                     if not has_membership:

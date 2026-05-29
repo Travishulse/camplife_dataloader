@@ -92,9 +92,8 @@ class CamplifeAPIClient(QObject):
 
     def make_api_call_with_retry(self, method, url, headers=None, json_payload=None, params=None, max_retries=6):
         """
-        Perform an API call with retries on 401/403 errors.
-        Automatically refreshes token on 401/403 before retrying.
-        This is intended to be called from background threads (like UploadWorker).
+        Perform an API call with exponential retries on connection exceptions,
+        auth credentials errors (401/403), rate limits (429), or server errors (500/502/503/504).
         """
         headers = headers or {}
         attempt = 0
@@ -105,30 +104,58 @@ class CamplifeAPIClient(QObject):
                     headers["Authorization"] = f"Bearer {self.access_token}"
 
                 resp = requests.request(method, url, headers=headers, json=json_payload, params=params, timeout=20)
-                if resp.status_code not in (401, 403):
-                    try:
-                        resp_json = resp.json()
-                    except Exception:
-                        resp_json = None
-                    logger.info(f"{method} {url} -> {resp.status_code}")
-                    return {"status_code": resp.status_code, "json": resp_json, "text": resp.text}
-                else:
+                
+                # Check status code categories
+                if resp.status_code in (401, 403):
                     logger.warning(f"Credential error {resp.status_code} (attempt {attempt}/{max_retries}), attempting token refresh")
                     if attempt < max_retries:
                         if self.refresh_token_sync():
-                            logger.info("Token refreshed, retrying request")
+                            logger.info("Token refreshed, retrying request immediately")
                             continue
                         else:
-                            logger.warning("Token refresh failed, retrying without new token")
-                            time.sleep(2)
+                            logger.warning("Token refresh failed, backing off before retry")
+                            time.sleep(min(16, 2 ** attempt))
                             continue
                     else:
                         self.status_msg.emit(f"Credential error after token refresh (attempt {attempt}/{max_retries}).", 5000)
+                
+                elif resp.status_code == 429:
+                    retry_after = resp.headers.get("Retry-After")
+                    try:
+                        sleep_time = int(retry_after)
+                        sleep_time = min(30, max(2, sleep_time)) # cap between 2s and 30s
+                    except Exception:
+                        sleep_time = min(16, 2 ** attempt)
+                    
+                    logger.warning(f"Rate limited (429) on {url} (attempt {attempt}/{max_retries}). Sleeping for {sleep_time}s.")
+                    self.status_msg.emit(f"Rate limited. Retrying in {sleep_time}s...", 4000)
+                    if attempt < max_retries:
+                        time.sleep(sleep_time)
+                        continue
+                        
+                elif resp.status_code in (500, 502, 503, 504):
+                    sleep_time = min(16, 2 ** attempt)
+                    logger.warning(f"Server error {resp.status_code} on {url} (attempt {attempt}/{max_retries}). Sleeping for {sleep_time}s.")
+                    self.status_msg.emit(f"Server error {resp.status_code}. Retrying in {sleep_time}s...", 4000)
+                    if attempt < max_retries:
+                        time.sleep(sleep_time)
+                        continue
+                
+                # If we get here, it's either success (2xx) or client error (400, 404, etc.)
+                try:
+                    resp_json = resp.json()
+                except Exception:
+                    resp_json = None
+                logger.info(f"{method} {url} -> {resp.status_code}")
+                return {"status_code": resp.status_code, "json": resp_json, "text": resp.text}
 
             except Exception as e:
-                logger.warning(f"Request exception (attempt {attempt}/{max_retries}): {e}")
-                self.status_msg.emit(f"Request exception (attempt {attempt}/{max_retries}): {e}", 5000)
-                time.sleep(2)
+                sleep_time = min(16, 2 ** attempt)
+                logger.warning(f"Request exception (attempt {attempt}/{max_retries}) on {url}: {e}. Sleeping for {sleep_time}s.")
+                self.status_msg.emit(f"Connection issue. Retrying in {sleep_time}s...", 4000)
+                if attempt < max_retries:
+                    time.sleep(sleep_time)
+                    continue
 
         logger.error(f"Request failed after {max_retries} attempts: {method} {url}")
         return {"status_code": None, "json": None, "text": f"Failed after {max_retries} attempts."}

@@ -97,7 +97,7 @@ class ResponseDialog(QDialog):
 # ---------------- Preview Dialog ----------------
 class PreviewDialog(QDialog):
     """
-    Clean PreviewDialog that uses UploadWorker and UploadProgressDialog to
+    Clean PreviewDialog that uses UploadWorker to
     perform uploads in a separate thread and update the table row-by-row.
     """
     def __init__(self, parent, df, column_map, top_fields, cg_alias, api_client):

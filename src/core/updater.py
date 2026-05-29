@@ -43,12 +43,12 @@ class UpdateChecker(QThread):
             tag_name = data.get("tag_name", "")
             release_notes = data.get("body", "No release notes available.")
             
-            # Find first asset containing .exe or zip, fallback to zipball_url
+            # Find first asset containing zip, fallback to zipball_url
             download_url = None
             assets = data.get("assets", [])
             for asset in assets:
                 name = asset.get("name", "").lower()
-                if name.endswith(".exe") or name.endswith(".zip"):
+                if name.endswith(".zip"):
                     download_url = asset.get("browser_download_url")
                     break
             

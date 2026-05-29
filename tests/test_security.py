@@ -1,18 +1,23 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import unittest
+from src.core.security import encrypt_secret, decrypt_secret, DecryptionError
 
-from src.core.security import encrypt_secret, decrypt_secret
+class TestSecurity(unittest.TestCase):
+    def test_encrypt_decrypt_success(self):
+        test_secret = "my_super_secret_key_123"
+        encrypted = encrypt_secret(test_secret)
+        self.assertNotEqual(test_secret, encrypted)
+        
+        decrypted = decrypt_secret(encrypted)
+        self.assertEqual(test_secret, decrypted)
 
-test_secret = "my_super_secret_key_123"
-encrypted = encrypt_secret(test_secret)
-decrypted = decrypt_secret(encrypted)
+    def test_decrypt_failure_raises_exception(self):
+        # Passing an invalid encrypted string should raise DecryptionError
+        with self.assertRaises(DecryptionError):
+            decrypt_secret("invalid_encrypted_ciphertext_string_12345")
 
-print(f"Original: {test_secret}")
-print(f"Encrypted: {encrypted}")
-print(f"Decrypted: {decrypted}")
+    def test_empty_string(self):
+        self.assertEqual(encrypt_secret(""), "")
+        self.assertEqual(decrypt_secret(""), "")
 
-if test_secret == decrypted:
-    print("Encryption/Decryption test PASSED")
-else:
-    print("Encryption/Decryption test FAILED")
+if __name__ == "__main__":
+    unittest.main()

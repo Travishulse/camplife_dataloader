@@ -577,8 +577,19 @@ class FramelessCamplifeLoader(QMainWindow):
             
         if os.path.exists(bat_path):
             pid = os.getpid()
+            
+            # Safe copy to system temp folder to prevent PyInstaller _MEIPASS deletion clashes
+            import tempfile
+            safe_bat_path = os.path.join(tempfile.gettempdir(), "apply_update.bat")
+            try:
+                shutil.copy2(bat_path, safe_bat_path)
+                run_path = safe_bat_path
+            except Exception:
+                # Fallback to original if copy fails
+                run_path = bat_path
+            
             # Launch batch script detached
-            subprocess.Popen([bat_path, str(pid), current_exe_dir, extracted_app_folder, exe_name], 
+            subprocess.Popen([run_path, str(pid), current_exe_dir, extracted_app_folder, exe_name], 
                              creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
             # Exit application
             self.close()

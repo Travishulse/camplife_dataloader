@@ -1,6 +1,6 @@
 # 🏕️ Camplife DataLoader
 
-**Version 1.0.0** | A desktop application for bulk-uploading membership data, notes, and tags to the Camplife property management platform.
+**Version 1.2.3** | A desktop application for bulk-uploading membership data, notes, and tags to the Camplife property management platform.
 
 ---
 
@@ -92,22 +92,14 @@ camplife_dataloader/
 │   ├── test_data.csv    # Sample test data
 │   └── qa_test_plan.md  # Full QA testing procedure
 └── docs/
-    ├── architecture.md     # System design & module reference
-    ├── version-history.md  # Changelog with semantic versioning
-    ├── roadmap.md          # Planned features (v1.1+)
-    ├── known-issues.md     # Documented bugs & limitations
-    └── update-protocol.md  # Rules for future modifications
+    └── UPDATE_WORKFLOW.md  # Step-by-step developer release & update workflow
 ```
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](docs/architecture.md) | System design, modules, data flow, design decisions |
-| [Version History](docs/version-history.md) | Changelog with v1.0.0 release notes |
-| [Roadmap](docs/roadmap.md) | Planned features for v1.1+ and v2.0 |
-| [Known Issues](docs/known-issues.md) | Current limitations and workarounds |
-| [Update Protocol](docs/update-protocol.md) | Mandatory rules for future changes |
+| [Update Workflow](docs/UPDATE_WORKFLOW.md) | Step-by-step developer release & update workflow |
 | [QA Test Plan](tests/qa_test_plan.md) | Step-by-step testing procedure |
 
 ## License

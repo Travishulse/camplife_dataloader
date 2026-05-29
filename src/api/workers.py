@@ -7,6 +7,39 @@ from src.api.auth_utils import perform_hmac_auth, load_credentials_from_config
 
 logger = logging.getLogger("camplife.auth")
 
+def fetch_and_parse_static_data(headers_auth, timeout=15):
+    """
+    Unified helper to fetch and parse resorts and membership types from the API.
+    Returns tuple: (resorts_list, memberships_list, error_message)
+    """
+    resorts = []
+    memberships = []
+    
+    # 1. Fetch resorts
+    try:
+        resp_res = requests.get(f"{BASE_API}/property", headers=headers_auth, timeout=timeout)
+        if resp_res.status_code == 200:
+            resorts = resp_res.json()
+        else:
+            return None, None, f"Failed to fetch resorts: {resp_res.status_code}"
+    except Exception as e:
+        return None, None, f"Resorts request exception: {str(e)}"
+        
+    # 2. Fetch membership types
+    try:
+        resp_mem = requests.get(f"{BASE_API}/account/membership", headers=headers_auth, timeout=timeout)
+        if resp_mem.status_code == 200:
+            mem_data = resp_mem.json()
+            names = [k for entry in mem_data if isinstance(entry, dict) for k in entry.keys()]
+            memberships = [(n[:100] + "...") if len(n) > 100 else n for n in names if n and str(n).strip()]
+        else:
+            return None, None, f"Failed to fetch memberships: {resp_mem.status_code}"
+    except Exception as e:
+        return None, None, f"Memberships request exception: {str(e)}"
+        
+    return resorts, memberships, None
+
+
 class AuthWorker(QThread):
     """
     Background worker that handles:
@@ -40,35 +73,21 @@ class AuthWorker(QThread):
             access_token = auth_result["token"]
             token_expiry = auth_result["expiry"]
 
-            logger.info("Loading resorts")
-            self.status_msg.emit("Loading resorts...", 0)
+            logger.info("Loading resorts & memberships")
+            self.status_msg.emit("Loading data...", 0)
             headers_auth = {"Authorization": f"Bearer {access_token}"}
-            resp_res = requests.get(f"{BASE_API}/property", headers=headers_auth, timeout=15)
-            resorts = []
-            if resp_res.status_code == 200:
-                resorts = resp_res.json()
-                logger.info(f"Loaded {len(resorts)} resorts")
-                self.resorts_loaded.emit(resorts)
+            
+            resorts, memberships, err = fetch_and_parse_static_data(headers_auth)
+            if err:
+                logger.warning(err)
+                self.status_msg.emit(err, 5000)
             else:
-                logger.warning(f"Failed to fetch resorts: status {resp_res.status_code}")
-                self.status_msg.emit(f"Failed to fetch resorts: {resp_res.status_code}", 5000)
-
-            logger.info("Loading membership types")
-            self.status_msg.emit("Loading memberships...", 0)
-            resp_mem = requests.get(f"{BASE_API}/account/membership", headers=headers_auth, timeout=15)
-            if resp_mem.status_code == 200:
-                mem_data = resp_mem.json()
-                names = []
-                for entry in mem_data:
-                    if isinstance(entry, dict):
-                        for k in entry.keys():
-                            names.append(k)
-                filtered = [ (n[:100] + "...") if len(n) > 100 else n for n in names if n and str(n).strip() != "" ]
-                logger.info(f"Loaded {len(filtered)} membership types")
-                self.memberships_loaded.emit(filtered)
-            else:
-                logger.warning(f"Failed to fetch memberships: status {resp_mem.status_code}")
-                self.status_msg.emit(f"Failed to fetch memberships: {resp_mem.status_code}", 5000)
+                if resorts:
+                    logger.info(f"Loaded {len(resorts)} resorts")
+                    self.resorts_loaded.emit(resorts)
+                if memberships:
+                    logger.info(f"Loaded {len(memberships)} membership types")
+                    self.memberships_loaded.emit(memberships)
 
             logger.info("Authentication and data loading complete")
             self.status_msg.emit("Connected ✅", 5000)
@@ -106,27 +125,13 @@ class FetchStaticDataWorker(QThread):
                 return
 
             headers_auth = {"Authorization": f"Bearer {auth_result['token']}"}
-
-            resp_res = requests.get(f"{BASE_API}/property", headers=headers_auth, timeout=15)
-            resorts = []
-            if resp_res.status_code == 200:
-                resorts = resp_res.json()
-                self.resorts_loaded.emit(resorts)
-            else:
-                self.finished.emit(False, f"Failed to fetch resorts: {resp_res.status_code}")
+            resorts, memberships, err = fetch_and_parse_static_data(headers_auth)
+            if err:
+                self.finished.emit(False, err)
                 return
 
-            resp_mem = requests.get(f"{BASE_API}/account/membership", headers=headers_auth, timeout=15)
-            memberships = []
-            if resp_mem.status_code == 200:
-                mem_data = resp_mem.json()
-                names = [k for entry in mem_data if isinstance(entry, dict) for k in entry.keys()]
-                memberships = [(n[:100] + "...") if len(n) > 100 else n for n in names if n and str(n).strip()]
-                self.memberships_loaded.emit(memberships)
-            else:
-                self.finished.emit(False, f"Failed to fetch memberships: {resp_mem.status_code}")
-                return
-
+            self.resorts_loaded.emit(resorts)
+            self.memberships_loaded.emit(memberships)
             self.finished.emit(True, f"Loaded {len(resorts)} resorts, {len(memberships)} membership types")
 
         except Exception as e:

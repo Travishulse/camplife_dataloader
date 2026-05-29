@@ -3,6 +3,10 @@ import hashlib
 import base64
 from cryptography.fernet import Fernet
 
+class DecryptionError(Exception):
+    """Custom exception raised when cryptographic decryption fails."""
+    pass
+
 def _get_machine_key():
     """Generates a consistent machine-specific key for encryption."""
     # Use hardware UUID as the base for the key
@@ -28,7 +32,7 @@ def decrypt_secret(ciphertext: str) -> str:
     try:
         f = Fernet(_get_machine_key())
         return f.decrypt(ciphertext.encode()).decode()
-    except Exception:
+    except Exception as e:
         # If decryption fails (e.g. data was not encrypted or key changed), 
-        # return original to avoid breaking existing setups
-        return ciphertext
+        # raise DecryptionError to be caught by the credentials loader
+        raise DecryptionError("Decryption failed. The secret may have been encrypted on a different machine or the key has changed.") from e
