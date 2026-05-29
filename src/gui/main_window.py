@@ -22,7 +22,7 @@ import subprocess
 class FramelessCamplifeLoader(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Camplife Data Loader 🏕️ v{VERSION}")
+        self.setWindowTitle(f"Camplife Data Loader v{VERSION}")
         
         # Set Window Icon
         icon_path = os.path.join(RESOURCE_DIR, "app_icon.png")
@@ -72,7 +72,16 @@ class FramelessCamplifeLoader(QMainWindow):
         title_bar.setObjectName("TitleBar")
         tlay = QHBoxLayout(title_bar)
         tlay.setContentsMargins(10, 2, 10, 2)
-        self.title_label = QLabel(f"🏕️ Camplife Data Loader v{VERSION}")
+        # Title Icon (replacing placeholder emoji)
+        self.title_icon = QLabel()
+        self.title_icon.setObjectName("TitleIcon")
+        icon_path = os.path.join(RESOURCE_DIR, "app_icon.png")
+        if os.path.exists(icon_path):
+            pixmap = QPixmap(icon_path).scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.title_icon.setPixmap(pixmap)
+        tlay.addWidget(self.title_icon)
+
+        self.title_label = QLabel(f"Camplife Data Loader v{VERSION}")
         self.title_label.setObjectName("TitleLabel")
         tlay.addWidget(self.title_label)
         tlay.addStretch()
@@ -541,12 +550,17 @@ class FramelessCamplifeLoader(QMainWindow):
     def apply_update_restart(self, temp_path):
         import zipfile
         import shutil
+        import logging
+        
+        logger = logging.getLogger("camplife")
         
         # Path to current running executable
         current_exe = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
         current_exe_abs = os.path.abspath(current_exe)
         current_exe_dir = os.path.dirname(current_exe_abs)
         exe_name = os.path.basename(current_exe_abs)
+        
+        logger.info(f"Starting update apply: exe_dir={current_exe_dir}, exe_name={exe_name}")
         
         # Clean and extract the ZIP package inside a temp folder
         temp_dir = os.path.dirname(temp_path)
@@ -559,7 +573,9 @@ class FramelessCamplifeLoader(QMainWindow):
             
             with zipfile.ZipFile(temp_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
+            logger.info(f"ZIP extracted successfully to: {extract_dir}")
         except Exception as e:
+            logger.error(f"ZIP extraction failed: {e}")
             self.update_label.setText(f"❌ Extraction failed: {str(e)[:30]}")
             return
             
@@ -567,6 +583,7 @@ class FramelessCamplifeLoader(QMainWindow):
         extracted_app_folder = os.path.join(extract_dir, "Camplife DataLoader")
         if not os.path.exists(extracted_app_folder):
             extracted_app_folder = extract_dir
+            logger.info(f"No nested folder found, using extract root: {extract_dir}")
 
         # Path to apply_update.bat (located in packaged resources directory)
         bat_path = os.path.join(RESOURCE_DIR, "apply_update.bat")
@@ -577,6 +594,7 @@ class FramelessCamplifeLoader(QMainWindow):
             
         if os.path.exists(bat_path):
             pid = os.getpid()
+            logger.info(f"Found apply_update.bat at: {bat_path}, launching with PID={pid}")
             
             # Safe copy to system temp folder to prevent PyInstaller _MEIPASS deletion clashes
             import tempfile
@@ -584,15 +602,45 @@ class FramelessCamplifeLoader(QMainWindow):
             try:
                 shutil.copy2(bat_path, safe_bat_path)
                 run_path = safe_bat_path
+                logger.info(f"Copied batch script to safe temp path: {safe_bat_path}")
             except Exception:
                 # Fallback to original if copy fails
                 run_path = bat_path
+                logger.warning(f"Could not copy batch to temp, using original: {bat_path}")
             
             # Launch batch script detached
             subprocess.Popen([run_path, str(pid), current_exe_dir, extracted_app_folder, exe_name], 
                              creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+            logger.info("Batch script launched. Exiting application for update swap.")
             # Exit application
             self.close()
             QApplication.quit()
         else:
+            logger.error(f"apply_update.bat not found at: {bat_path}")
             self.update_label.setText("❌ apply_update.bat not found. Restart manually.")
+
+    @staticmethod
+    def cleanup_stale_update_artifacts():
+        """Remove leftover _internal.old directories from previous updates.
+        
+        After a successful update, the batch script may fail to delete the old
+        _internal.old directory if files are still locked. This method cleans
+        it up on the next application launch.
+        """
+        import shutil
+        import logging
+        logger = logging.getLogger("camplife")
+        
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        
+        stale_dir = os.path.join(app_dir, "_internal.old")
+        if os.path.exists(stale_dir):
+            logger.info(f"Found stale _internal.old directory, cleaning up: {stale_dir}")
+            try:
+                shutil.rmtree(stale_dir, ignore_errors=True)
+                logger.info("Successfully cleaned up _internal.old")
+            except Exception as e:
+                logger.warning(f"Could not clean up _internal.old: {e}")

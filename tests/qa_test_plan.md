@@ -17,7 +17,7 @@ This document serves as the master Quality Assurance (QA) checklist for the Camp
 ### 1.1 Application Launch
 - **Task**: Open the application.
 - **Criteria**: 
-  - The loading screen ("🏕️ Camplife Data Loader") appears centered on the screen.
+  - The loading screen appears centered on the screen.
   - The loading screen seamlessly transitions to the Main Window.
   - The Main Window is ~80% of the screen size, centered, and fully resizable.
 

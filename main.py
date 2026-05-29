@@ -13,6 +13,10 @@ if __name__ == "__main__":
     os.makedirs(LOG_DIR, exist_ok=True)
     logger = setup_logger()
     logger.info("Application started")
+
+    # Clean up stale update artifacts from previous update cycles
+    FramelessCamplifeLoader.cleanup_stale_update_artifacts()
+
     app = QApplication(sys.argv)
     app.setStyleSheet(LIGHT_THEME)
     

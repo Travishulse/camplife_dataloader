@@ -1,7 +1,9 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap
+import os
 
-from config import VERSION
+from config import VERSION, RESOURCE_DIR
 
 class LoadingScreen(QWidget):
     """Lightweight loading screen that appears instantly"""
@@ -33,8 +35,19 @@ class LoadingScreen(QWidget):
         container_layout = QVBoxLayout(container)
         container_layout.setSpacing(20)
         
-        # Title with emoji
-        title = QLabel("🏕️ Camplife Data Loader")
+        # Logo Icon (replacing placeholder emoji)
+        logo_label = QLabel()
+        logo_label.setObjectName("LogoLabel")
+        logo_path = os.path.join(RESOURCE_DIR, "app_icon.png")
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label.setPixmap(pixmap)
+        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setStyleSheet("background: transparent; border: none;")
+        container_layout.addWidget(logo_label)
+
+        # Title
+        title = QLabel("Camplife Data Loader")
         title.setStyleSheet("color: #e3e8e5; font-size: 24px; font-weight: bold; background: transparent; border: none;")
         title.setAlignment(Qt.AlignCenter)
         container_layout.addWidget(title)

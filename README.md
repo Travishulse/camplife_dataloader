@@ -1,6 +1,6 @@
-# 🏕️ Camplife DataLoader
+# Camplife DataLoader
 
-**Version 1.2.3** | A desktop application for bulk-uploading membership data, notes, and tags to the Camplife property management platform.
+**Version 1.2.4** | A desktop application for bulk-uploading membership data, notes, and tags to the Camplife property management platform.
 
 ---
 
